@@ -1,0 +1,300 @@
+options
+{
+  static = true;
+  LOOKAHEAD = 2;
+}
+
+PARSER_BEGIN(MyLang)
+import java.io.*;
+import java.util.ArrayList;
+public class MyLang
+{
+  public static void main(String args []) throws ParseException
+  {
+   try{
+    	FileInputStream f = new FileInputStream(args[0]);
+    	MyLang parser = new MyLang(f);
+    	Exp exp = MyLang.program();
+    	if(exp != null){
+    		ValEnv ve = exp.eval(new Env());
+        } 
+   }
+   catch(FileNotFoundException e){
+		System.err.println("File not found: " + args[0]);
+   }
+	System.exit(0);
+   }
+}
+
+PARSER_END(MyLang)
+
+SKIP :
+{
+  " "
+| "\r"
+| "\t"
+| "\n"
+}
+
+TOKEN : /* OPERATORS */
+{
+  < PLUS     : "+" >
+| < MINUS    : "-" >
+| < MULTIPLY : "*" >
+| < DIVIDE   : "/" >
+}
+
+TOKEN : 
+{
+  < LITERAL  : < INTEGER > | < BOOLEAN > >
+| < #INTEGER : (< DIGIT >)+ >
+| < #DIGIT   : [ "0"-"9" ] >
+| < #BOOLEAN : "T" | "F" >
+}
+
+TOKEN :
+{
+  < LPAREN       : "(" >
+| < RPAREN       : ")" >
+| < LBRACKET     : "[" >
+| < RBRACKET     : "]" >
+| < OUT          : "out" >
+| < OUTLN		 : "outln" >
+| < IN           : "in" >
+| < ASSIGN       : "=" >
+| < THIS 		 : "this" >
+| < AND 		 : "and" >
+| < OR			 : "or" >
+| < NOT		     : "!" >
+| < IF 			 : "if" >
+| < ELSE		 : "else" >
+| < GREATERTHAN	 : ">" >
+| < LESSTHAN	 : "<" >
+| < LEQ      	 : "<=" >
+| < GEQ	         : ">=" >
+| < RARROW       : "->" >
+| < EQUALS       : "?" >
+| < DM           : "DM" >
+| < DC           : "DC" >
+| < DI			 : "DI" >
+| < END		     : "E" ([ "A"-"Z" ])+ >
+| < COLON		 : ":" >
+| < GIVE		 : "give">
+| < MAIN		 : "MAIN" >
+| < SELF		 : "self" >
+| < DOT			 : "." >
+| < FOR			 : "for" >
+| < CONTAINS     : "contains" >
+| < ADD			 : "add" >
+| < COMMENT      : "//" (~["\""])* "//">
+| < STRING       :  "\"" (~["\""])* "\"">
+| < VARIABLE     : < IDENTIFIER > >
+| < #IDENTIFIER  : < INITIAL > (< SUBSEQUENT >)* >
+| < #INITIAL     :  [ "A"-"Z" ] | [ "a"-"z" ] >
+| < #SUBSEQUENT  : < INITIAL > | < DIGIT >  >
+}
+
+Exp program():
+{ArrayList<Exp> exps = new ArrayList<Exp>(); Exp exp = null; Exp main = null;}
+{ 
+  ((exp = method() | exp = cl()) { exps.add(exp);})* exp = main() < EOF >
+  {return new ProgExp(new MultiExp(exps), exp);}
+}
+
+Exp main():
+{Token t = null;ArrayList<String> params = new ArrayList<String>(); Exp exp = null; ArrayList<Exp> exps = new ArrayList<Exp>();}
+{
+  t=< MAIN > params=params() < COLON >
+  exp = body() 
+  {return new AssignExp( t.image, new MethodExp(params, exp));}
+}
+
+ArrayList<String> params():
+{ArrayList<String> params = new ArrayList<String>();}
+{
+	< LPAREN > (< VARIABLE > {params.add(token.image);})*< RPAREN > {return params;}
+}
+
+Exp exp():
+{Exp exp = null; Token t = null;}
+{
+  
+  exp = sum() 		{return exp;}
+| exp = list() 		{return exp;}
+| exp = logical()   {return exp;}
+| LOOKAHEAD(3)exp = procCall()	{return exp;}
+| exp = comment()   {return exp;}
+| < STRING >   		{return new StringExp(token.image);} 
+| < IN > < LPAREN > (exp=exp())? < RPAREN > {return new InExp(exp);}
+}
+
+Exp stm():
+{Exp exp = null; Token t = null;}
+{ 
+  exp = comment()      {return exp;}
+| exp = assignment()   {return exp;}
+| exp = conditional()  {return exp;}
+| exp = give()		   {return exp;}
+| exp = method()	   {return exp;}
+| exp = forLoop()	   {return exp;}
+| LOOKAHEAD(3)exp = add()          {return exp;}
+| exp = cl() 	       {return exp;}
+| exp = exp()		   {return exp;}
+| (t=< OUT >|t=< OUTLN >)< LPAREN > exp = exp() < RPAREN > {return new OutExp(exp,t.image);} 
+}
+
+Exp list():
+{ArrayList<Exp> exps = new ArrayList<Exp>(); Exp exp = null;}
+{	< LBRACKET > (exp = exp() {exps.add(exp);})* < RBRACKET >
+	{return new ListExp(exps);}}
+
+Exp contains():
+{Exp exp = null; Token t = null;}
+{
+	t=< VARIABLE > < DOT > < CONTAINS > < LPAREN > exp = exp() < RPAREN > 
+	{return new ContainsExp(t.image, exp);}
+}
+
+Exp add():
+{Token t = null;Exp exp = null;}
+{
+	t=< VARIABLE > < DOT > < ADD > < LPAREN > exp = exp() < RPAREN >
+	{return new AddExp(t.image, exp);}
+}
+
+Exp method():
+{Token t = null;ArrayList<String> params = new ArrayList<String>(); Exp exp = null; ArrayList<Exp> exps = new ArrayList<Exp>();}
+{
+  < DM > t = < VARIABLE >  params=params() < COLON > exp = body()
+  {return new AssignExp(t.image, new MethodExp(params, exp));}
+}
+
+Exp cl():
+{Exp init = null; ArrayList<Exp> meths = new ArrayList<Exp>(); Token t = null;}
+{
+< DC > t = < VARIABLE > <COLON > init = initializer() meths = methodList() < END >
+{return new AssignExp(t.image, new ClassExp(init, meths));}
+}
+
+Exp initializer():
+{ArrayList<String> params = new ArrayList<String>(); ArrayList<Exp> fields = new ArrayList<Exp>(); Exp exp = null;}
+{
+< DI > params = params()
+< COLON > (exp = field() { fields.add(exp);})*
+(exp = body() | < END >)
+ {return new InitializerExp(params, fields, exp);}
+}
+
+Exp field():
+{ Exp exp1 = null; Token t;}
+{	< THIS > < DOT > t=< VARIABLE > <ASSIGN >  exp1=exp()
+	 {return new AssignExp(t.image, exp1);}}
+
+
+ArrayList<Exp> methodList():
+{ArrayList<Exp> methods = new ArrayList<Exp>(); Exp exp = null;}
+{
+	(exp = method() {methods.add(exp);})* {return methods;}
+}
+
+Exp sum():
+{Exp exp1 = null, exp2 = null; Token t;}
+{
+  exp1=term()
+  (( t=< PLUS >| t=< MINUS >)
+  exp2=term()
+  {exp1 = new ArithExp(t.image, exp1, exp2);})*
+  {return exp1;}
+}
+
+Exp term():
+{Exp exp1 = null, exp2 = null; Token t;}
+{
+  exp1=unary()
+  (( t=< MULTIPLY >| t=< DIVIDE >)
+  exp2=unary()
+  {exp1 = new ArithExp(t.image, exp1, exp2);})*
+  {return exp1;}
+}
+
+Exp unary():
+{Exp exp = null;}
+{
+  < MINUS > exp=element(){ return new ArithExp("-", new LiteralExp("0"), exp);}
+| exp=element(){return exp;}
+}
+
+Exp element():
+{Exp exp = null;Token t = null;}
+{
+ (< LITERAL >  {exp =  new LiteralExp(token.image);}
+|t = < VARIABLE > <LBRACKET > exp = exp() < RBRACKET> {return new ArrayAccessExp(t.image, exp); /*array[i]*/}
+| < VARIABLE > {exp =  new IdExp(token.image);}
+| < LPAREN > exp=exp() < RPAREN >) {return exp;}
+| exp = procCall()	{return exp;}
+}
+
+Exp forLoop():
+{Exp exp1 = null;Token t1; Token t2; Exp exp2 = null; Exp exp3 = null; Exp exp4 = null;}
+{
+ 	< FOR > t1=<VARIABLE > < ASSIGN > 
+ 	< LPAREN > exp1 = exp() < RARROW > exp2 = exp() < RPAREN >
+ 	 (t2=< PLUS > | t2=< MINUS > ) exp3 = exp() < COLON >
+ 	 exp4 = body() 
+ 	 { return new ForExp(t1.image, t2.image, exp1, exp2, exp3, exp4);}}
+
+Exp assignment():
+{Exp exp1 = null; Exp exp2 = null; Token t; ArrayList<Exp> params = new ArrayList<Exp>();}
+{
+  t = < VARIABLE > <ASSIGN > exp1=exp()  {return new AssignExp(t.image, exp1);  /*x = 5*/}
+| t = < VARIABLE > <LBRACKET > exp1 = exp() < RBRACKET > < ASSIGN > exp2 = exp()
+	{return new ArrayAssignExp(t.image, exp1, exp2); /*array[i] = x*/}	{ /*	  
+| t = < VARIABLE > < ASSIGN > < IDENTIFIER > <LPAREN > params = params() <RPAREN > {return new ObjectAssignExp(t.image, )} */
+	}
+}
+
+Exp conditional():
+{Exp exp = null; Exp exps1 = null; Exp exps2 = null;}
+{ 
+  < IF > exp = logical() < COLON > exps1 = body()
+  (< ELSE > < COLON > exps2 = body())?
+  {return new ConditionalExp(exp, exps1, exps2);}
+}
+
+Exp logical():
+{boolean neg = false; Exp exp1 = null; Exp exp2 = null; Token t;}
+{
+    t=< NOT >  < LPAREN > exp1=element() (t= < EQUALS > | t = < LESSTHAN > | t=< GREATERTHAN > |t = < LEQ > | t = < GEQ >) exp2=element() < RPAREN > {neg = true; return new LogicalExp(neg, t.image, exp1, exp2);}
+   |exp1=element() (t= < EQUALS > | t = < LESSTHAN > | t=< GREATERTHAN > |t = < LEQ > | t = < GEQ >) exp2=element() {return new LogicalExp(neg, t.image, exp1, exp2);}
+   |exp1 = contains()  {return exp1;}
+}
+Exp body():
+{ArrayList<Exp> exps = new ArrayList<Exp>(); Exp exp = null;}
+{ 
+    {//((exp = stm() | exp = exp()) {exps.add(exp); }|
+    }
+   (LOOKAHEAD(3)(exp = stm() | exp = exp()) {exps.add(exp);})+ < END > 
+  {return new MultiExp(exps);}
+}
+
+Exp give():
+{ Exp exp = null; }
+{
+	< GIVE > exp=exp() {return new GiveExp(exp);}
+}
+
+Exp procCall():
+{ArrayList<Exp> exps = new ArrayList<Exp>(); Exp exp = null; Exp caller = null;}
+{
+	(< VARIABLE > {caller = new IdExp(token.image);} < RARROW >< VARIABLE > {exps.add(new IdExp(token.image));} < LPAREN > (exp = exp(){exps.add(exp);})* < RPAREN >
+	{return new ProcedureExp(caller, exps);})
+| (
+    < DOT >< VARIABLE > {exps.add(new IdExp(token.image));} < LPAREN > (exp = exp(){exps.add(exp);})* < RPAREN >
+	{return new ProcedureExp(caller, exps);})
+}
+
+Exp comment():
+{}
+{
+	< COMMENT >{return new CommentExp();}
+}
