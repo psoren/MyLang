@@ -1,0 +1,58 @@
+Testing initiated. Wed Nov 15 15:36:34 EST 2017
+Files submitted:
+AddExp.java
+ArithExp.java
+ArrayAccessExp.java
+ArrayAssignExp.java
+AssignExp.java
+ASTNode.java
+bfs.txt
+bst.txt
+Closure.java
+CommentExp.java
+ConditionalExp.java
+ContainsExp.java
+Env.java
+Exp.java
+factorial-in.txt
+factorial.txt
+feedback.txt
+ForExp.java
+GiveExp.java
+IdExp.java
+InExp.java
+int-list-in.txt
+ListExp.java
+ListObj.java
+LiteralExp.java
+LogicalExp.java
+maximum-in.txt
+maximum.txt
+MethodExp.java
+MultiExp.java
+MyLangConstants.java
+MyLang.java
+MyLang.jj
+MyLangTokenManager.java
+OutExp.java
+ParseException.java
+ProcedureExp.java
+ProgExp.java
+quicksort.txt
+SimpleCharStream.java
+StringExp.java
+Token.java
+TokenMgrError.java
+unique-out.txt
+unique.txt
+ValEnv.java
+==================================================
+Testing Language Design Phase 2 ...
+==================================================
+MyLang.jj compilation successful.
+MyLang.java compilation successful.
+:maximum: CORRECT!
+:factorial: CORRECT!
+:unique: CORRECT!
+:quicksort: CORRECT!
+Testing completed. Wed Nov 15 15:36:38 EST 2017
